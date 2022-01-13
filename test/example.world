@@ -31,7 +31,7 @@
         <model name="detector">
             <pose>-2 0 1 0 0 0</pose>
             <static>true</static>
-            <link name="link0">
+            <link name="detector">
                 <sensor type="logical_camera" name="detector_camera">
                     <always_on>1</always_on>
                     <update_rate>1</update_rate>
@@ -84,6 +84,18 @@
             </ros>
             <frame_name>map</frame_name>
             <update_rate>2</update_rate>
+            <model_whitelist>
+                <prefix>whitelisted</prefix>
+            </model_whitelist>
+        </plugin>
+
+        <!-- set frame_name to a model to publish model poses relative to the model of same name-->
+        <plugin name="detection_global" filename="libgazebo_ros_detections.so">
+            <ros>
+                <remapping>~/detections:=detector/detections</remapping>
+            </ros>
+            <frame_name>detector</frame_name>
+            <max_distance>10.0</max_distance>
             <model_whitelist>
                 <prefix>whitelisted</prefix>
             </model_whitelist>

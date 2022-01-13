@@ -74,6 +74,10 @@ private:
 
   std::string frame_name_{"map"};
 
+  gazebo::physics::ModelPtr reference_frame_;
+
+  std::optional<double> max_distance_;
+
   /// Last update time.
   gazebo::common::Time last_update_time_;
 
@@ -114,6 +118,16 @@ public:
     auto frame_name = sdf->FindElement("frame_name");
     if (frame_name) {
       frame_name_ = frame_name->Get<std::string>();
+    } else {
+      frame_name_ = "map";
+    }
+    if (frame_name_ != "map" && frame_name_ != "world") {
+      reference_frame_ = world->ModelByName(frame_name_);
+    }
+
+    auto max_distance = sdf->FindElement("max_distance");
+    if (max_distance) {
+      max_distance_ = max_distance->Get<double>();
     }
 
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
@@ -148,13 +162,22 @@ public:
       if (!starts_with_one_of(name, model_whitelist_)) {
         continue;
       }
+
+      auto pose = model->WorldPose();
+      if (reference_frame_) {
+        pose = reference_frame_->WorldPose().Inverse() * pose;
+        if (max_distance_.has_value() && pose.Pos().Length() > max_distance_.value()) {
+          continue;
+        }
+      }
+
       auto & detection = msg.detections.emplace_back();
       detection.id = name;
       detection.bbox = gazebo_ros::Convert<BoundingBox3D>(model->BoundingBox());
       auto & result = detection.results.emplace_back();
       result.hypothesis.score = 1.0;
       result.hypothesis.class_id = name;
-      result.pose.pose = gazebo_ros::Convert<Pose>(model->WorldPose());
+      result.pose.pose = gazebo_ros::Convert<Pose>(pose);
     }
 
     pub_detections_->publish(msg);
