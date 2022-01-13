@@ -1,0 +1,92 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+    <world name="gazebo_ros_vision_test">
+        <include>
+            <!-- plane should be ignored by the detector plugins -->
+            <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/Ground Plane</uri>
+        </include>
+        <include>
+            <uri>model://sun</uri>
+        </include>
+        <model name="whitelisted_model">
+            <pose>1.5 0 0.5 0 0 0</pose>
+            <static>true</static>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+        <model name="detector">
+            <pose>-2 0 1 0 0 0</pose>
+            <static>true</static>
+            <link name="link0">
+                <sensor type="logical_camera" name="detector_camera">
+                    <always_on>1</always_on>
+                    <update_rate>1</update_rate>
+                    <logical_camera>
+                        <near>1.0</near>
+                        <far>8.0</far>
+                        <aspect_ratio>1.33333</aspect_ratio>
+                        <horizontal_fov>30</horizontal_fov>
+                    </logical_camera>
+                    <visualize>true</visualize>
+                    <plugin name="camera_detections" filename="libgazebo_ros_logical_camera.so">
+                        <ros>
+                            <namespace>gazebo_ros_vision</namespace>
+                            <remapping>~/detections:=logical_camera/detections</remapping>
+                        </ros>
+                        <model_whitelist>
+                            <prefix>whitelisted</prefix>
+                        </model_whitelist>
+                        <pose_noise>
+                            <position>
+                                <x>
+                                    <noise type="gaussian_quantized">
+                                        <stddev>1.0</stddev>
+                                        <precision>0.1</precision>
+                                    </noise>
+                                </x>
+                                <y>
+                                    <noise type="gaussian_quantized">
+                                        <stddev>1.0</stddev>
+                                        <precision>0.1</precision>
+                                    </noise>
+                                </y>
+                                <z>
+                                    <noise type="gaussian_quantized">
+                                        <stddev>1.0</stddev>
+                                        <precision>0.1</precision>
+                                    </noise>
+                                </z>
+                            </position>
+                        </pose_noise>
+                        <pose_noise_published_scale>2.0</pose_noise_published_scale>
+                    </plugin>
+                </sensor>
+            </link>
+        </model>
+
+        <plugin name="detection_global" filename="libgazebo_ros_detections.so">
+            <ros>
+                <remapping>~/detections:=world/detections</remapping>
+            </ros>
+            <frame_name>map</frame_name>
+            <update_rate>2</update_rate>
+            <model_whitelist>
+                <prefix>whitelisted</prefix>
+            </model_whitelist>
+        </plugin>
+    </world>
+</sdf>
