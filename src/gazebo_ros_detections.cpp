@@ -123,6 +123,10 @@ public:
     }
     if (frame_name_ != "map" && frame_name_ != "world") {
       reference_frame_ = world->ModelByName(frame_name_);
+      if (!reference_frame_) {
+        RCLCPP_ERROR(ros_node_->get_logger(), "frame_name %s not found in world", frame_name_.c_str());
+        return;
+      }
     }
 
     auto max_distance = sdf->FindElement("max_distance");
