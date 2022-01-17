@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <gazebo/common/Plugin.hh>
+#include <gazebo/physics/Link.hh>
 #include <gazebo/physics/Model.hh>
 #include <gazebo/physics/World.hh>
 #include <gazebo_ros/conversions/builtin_interfaces.hpp>
@@ -40,6 +41,8 @@ class GazeboRosDetections : public gazebo::ModelPlugin
 {
 private:
   gazebo::physics::ModelPtr model_;
+
+  gazebo::physics::LinkPtr reference_link_;
 
   gazebo_ros::Node::SharedPtr ros_node_;
 
@@ -92,6 +95,17 @@ public:
       RCLCPP_DEBUG(ros_node_->get_logger(), "plugin missing <update_rate>, defaults to 1Hz");
     }
 
+    auto frame_name_elem = _sdf->FindElement("frame_name");
+    if (frame_name_elem) {
+      frame_name_ = frame_name_elem->Get<std::string>();
+      reference_link_ = model_->GetLink(frame_name_);
+      if (!reference_link_) {
+        RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid link");
+        return;
+      }
+    } else {
+      frame_name_ = model_->GetName();
+    }
     frame_name_ = _sdf->Get<std::string>("frame_name", model_->GetName()).first;
 
     auto max_distance = _sdf->FindElement("max_distance");
@@ -133,7 +147,14 @@ public:
       }
 
       auto pose = model->WorldPose();
-      pose = model_->WorldPose().Inverse() * pose;
+
+      Pose3d reference_pose;
+      if (reference_link_) {
+        reference_pose = reference_link_->WorldPose();
+      } else {
+        reference_pose = model_->WorldPose();
+      }
+      pose = reference_pose.Inverse() * pose;
       if (max_distance_.has_value() && pose.Pos().Length() > max_distance_.value()) {
         continue;
       }
