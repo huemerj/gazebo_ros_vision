@@ -29,7 +29,7 @@
 
 namespace gazebo_ros_vision
 {
-
+using geometry_msgs::msg::Vector3;
 using vision_msgs::msg::Detection3DArray;
 using ignition::math::Pose3d;
 
@@ -47,11 +47,11 @@ private:
 
   gazebo::event::ConnectionPtr sensor_update_event_;
 
-  /// Scale simulated pose noise covariance by this value to obtain published covariance
+  PoseNoise pose_noise_;
+
   double pose_noise_published_scale_;
 
-  /// Noise to apply to detection poses
-  PoseNoise pose_noise_;
+  Vector3d bounding_box_size_;
 
 public:
   GazeboRosLogicalCamera() = default;
@@ -89,13 +89,8 @@ protected:
     if (pose_noise) {
       pose_noise_.Load(pose_noise);
     }
-
-    auto pose_noise_published_scale = _sdf->FindElement("pose_noise_published_scale");
-    if (pose_noise_published_scale) {
-      pose_noise_published_scale_ = pose_noise_published_scale->Get<double>();
-    } else {
-      pose_noise_published_scale_ = 1.0;
-    }
+    pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
+    bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
 
     auto qos = node->get_qos().get_publisher_qos(
       "~/detections",
@@ -127,9 +122,7 @@ protected:
       Pose3d pose = gazebo::msgs::ConvertIgn(model.pose());
       pose = pose_noise_.Apply(pose);
       det.results[0].hypothesis.score = 1.0;
-      det.bbox.size.x = 1.0;
-      det.bbox.size.y = 1.0;
-      det.bbox.size.z = 1.0;
+      det.bbox.size = gazebo_ros::Convert<Vector3>(bounding_box_size_);
       det.results[0].pose.pose =
         gazebo_ros::Convert<geometry_msgs::msg::Pose>(
         pose);

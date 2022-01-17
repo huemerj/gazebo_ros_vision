@@ -9,7 +9,7 @@
             <uri>model://sun</uri>
         </include>
         <model name="whitelisted_model">
-            <pose>1.5 0 0.5 0 0 0</pose>
+            <pose>1.5 0 0.5 0 0 0.78525</pose>
             <static>true</static>
             <link name="link">
                 <visual name="visual">
@@ -84,13 +84,14 @@
             </ros>
             <frame_name>map</frame_name>
             <update_rate>2</update_rate>
+            <bounding_box_size>2.0 2.0 0.2</bounding_box_size>
             <model_whitelist>
                 <prefix>whitelisted</prefix>
             </model_whitelist>
         </plugin>
 
         <!-- set frame_name to a model to publish model poses relative to the model of same name-->
-        <plugin name="detection_global" filename="libgazebo_ros_detections.so">
+        <plugin name="detection_local" filename="libgazebo_ros_detections.so">
             <ros>
                 <remapping>~/detections:=detector/detections</remapping>
             </ros>

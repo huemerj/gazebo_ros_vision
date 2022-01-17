@@ -25,38 +25,16 @@
 
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include "utils.hpp"
-
-
-namespace gazebo_ros
-{
-using geometry_msgs::msg::Point;
-using geometry_msgs::msg::Vector3;
-using vision_msgs::msg::BoundingBox3D;
-using ignition::math::AxisAlignedBox;
-
-template<class T>
-T Convert(const AxisAlignedBox &)
-{
-  T::ConversionNotImplemented;
-}
-
-template<>
-BoundingBox3D Convert(const AxisAlignedBox & in)
-{
-  BoundingBox3D msg;
-  msg.size = Convert<Vector3>(in.Size());
-  return msg;
-}
-
-} // namespace gazebo_ros
+#include "noise.hpp"
 
 namespace gazebo_ros_vision
 {
 
 using geometry_msgs::msg::Pose;
+using geometry_msgs::msg::Vector3;
 using vision_msgs::msg::Detection3DArray;
-using vision_msgs::msg::BoundingBox3D;
 using ignition::math::Pose3d;
+using ignition::math::Vector3d;
 
 class GazeboRosDetections : public gazebo::WorldPlugin
 {
@@ -78,6 +56,12 @@ private:
 
   std::optional<double> max_distance_;
 
+  PoseNoise pose_noise_;
+
+  double pose_noise_published_scale_;
+
+  Vector3d bounding_box_size_;
+
   /// Last update time.
   gazebo::common::Time last_update_time_;
 
@@ -88,13 +72,13 @@ public:
   GazeboRosDetections() = default;
   virtual ~GazeboRosDetections() = default;
 
-  void Load(gazebo::physics::WorldPtr world, sdf::ElementPtr sdf)
+  void Load(gazebo::physics::WorldPtr world, sdf::ElementPtr _sdf)
   {
     world_ = world;
-    ros_node_ = gazebo_ros::Node::Get(sdf);
+    ros_node_ = gazebo_ros::Node::Get(_sdf);
     const gazebo_ros::QoS & qos = ros_node_->get_qos();
 
-    auto model_whitelist = sdf->FindElement("model_whitelist");
+    auto model_whitelist = _sdf->FindElement("model_whitelist");
     if (model_whitelist) {
       model_whitelist_ = get_string_set(model_whitelist, "prefix");
     }
@@ -107,7 +91,7 @@ public:
       }
     }
 
-    auto update_rate = sdf->FindElement("update_rate");
+    auto update_rate = _sdf->FindElement("update_rate");
     if (update_rate) {
       update_rate_ = update_rate->Get<double>();
     } else {
@@ -115,7 +99,7 @@ public:
       update_rate_ = 1.0;
     }
 
-    auto frame_name = sdf->FindElement("frame_name");
+    auto frame_name = _sdf->FindElement("frame_name");
     if (frame_name) {
       frame_name_ = frame_name->Get<std::string>();
     } else {
@@ -124,15 +108,24 @@ public:
     if (frame_name_ != "map" && frame_name_ != "world") {
       reference_frame_ = world->ModelByName(frame_name_);
       if (!reference_frame_) {
-        RCLCPP_ERROR(ros_node_->get_logger(), "frame_name %s not found in world", frame_name_.c_str());
+        RCLCPP_ERROR(
+          ros_node_->get_logger(), "frame_name %s not found in world",
+          frame_name_.c_str());
         return;
       }
     }
 
-    auto max_distance = sdf->FindElement("max_distance");
+    auto max_distance = _sdf->FindElement("max_distance");
     if (max_distance) {
       max_distance_ = max_distance->Get<double>();
     }
+
+    auto pose_noise = _sdf->FindElement("pose_noise");
+    if (pose_noise) {
+      pose_noise_.Load(pose_noise);
+    }
+    pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
+    bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
 
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
       "~/detections", qos.get_publisher_qos("~/detections", rclcpp::SensorDataQoS().reliable()));
@@ -175,13 +168,17 @@ public:
         }
       }
 
-      auto & detection = msg.detections.emplace_back();
-      detection.id = name;
-      detection.bbox = gazebo_ros::Convert<BoundingBox3D>(model->BoundingBox());
-      auto & result = detection.results.emplace_back();
+      auto & det = msg.detections.emplace_back();
+      det.id = name;
+      det.bbox.size =
+        gazebo_ros::Convert<Vector3>(bounding_box_size_);
+      auto & result = det.results.emplace_back();
       result.hypothesis.score = 1.0;
       result.hypothesis.class_id = name;
+
+      pose = pose_noise_.Apply(pose);
       result.pose.pose = gazebo_ros::Convert<Pose>(pose);
+      pose_noise_.SetCovariance(det.results[0].pose, pose_noise_published_scale_);
     }
 
     pub_detections_->publish(msg);
