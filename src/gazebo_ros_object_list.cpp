@@ -29,27 +29,26 @@
 
 namespace gazebo_ros_vision
 {
-
 using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::Vector3;
 using vision_msgs::msg::Detection3DArray;
 using ignition::math::Pose3d;
 using ignition::math::Vector3d;
 
-class GazeboRosDetections : public gazebo::ModelPlugin
+class GazeboRosObjectList : public gazebo::WorldPlugin
 {
 private:
-  gazebo::physics::ModelPtr model_;
+  gazebo::physics::WorldPtr world_;
 
   gazebo_ros::Node::SharedPtr ros_node_;
 
   rclcpp::Publisher<Detection3DArray>::SharedPtr pub_detections_;
 
+  std::set<std::string> model_whitelist_;
+
   RateControl rate_control_;
 
   std::string frame_name_{"map"};
-
-  std::set<std::string> model_whitelist_;
 
   std::optional<double> max_distance_;
 
@@ -63,13 +62,14 @@ private:
   gazebo::event::ConnectionPtr update_connection_;
 
 public:
-  GazeboRosDetections() = default;
-  virtual ~GazeboRosDetections() = default;
+  GazeboRosObjectList() = default;
+  virtual ~GazeboRosObjectList() = default;
 
-  void Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf)
+  void Load(gazebo::physics::WorldPtr world, sdf::ElementPtr _sdf)
   {
-    model_ = _model;
+    world_ = world;
     ros_node_ = gazebo_ros::Node::Get(_sdf);
+    const gazebo_ros::QoS & qos = ros_node_->get_qos();
 
     auto model_whitelist = _sdf->FindElement("model_whitelist");
     if (model_whitelist) {
@@ -90,12 +90,7 @@ public:
       RCLCPP_DEBUG(ros_node_->get_logger(), "plugin missing <update_rate>, defaults to 1Hz");
     }
 
-    frame_name_ = _sdf->Get<std::string>("frame_name", model_->GetName()).first;
-
-    auto max_distance = _sdf->FindElement("max_distance");
-    if (max_distance) {
-      max_distance_ = max_distance->Get<double>();
-    }
+    auto frame_name = _sdf->Get<std::string>("frame_name", "map").first;
 
     auto pose_noise = _sdf->FindElement("pose_noise");
     if (pose_noise) {
@@ -104,12 +99,11 @@ public:
     pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
     bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
 
-    const gazebo_ros::QoS & qos = ros_node_->get_qos();
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
       "~/detections", qos.get_publisher_qos("~/detections", rclcpp::SensorDataQoS().reliable()));
 
     update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
-      std::bind(&GazeboRosDetections::OnUpdate, this, std::placeholders::_1));
+      std::bind(&GazeboRosObjectList::OnUpdate, this, std::placeholders::_1));
   }
 
   void OnUpdate(const gazebo::common::UpdateInfo & info)
@@ -122,18 +116,13 @@ public:
     msg.header.frame_id = frame_name_;
     msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(info.simTime);
 
-    for (const auto & model: model_->GetWorld()->Models()) {
+    for (const auto & model: world_->Models()) {
       auto name = model->GetName();
       if (!starts_with_one_of(name, model_whitelist_)) {
         continue;
       }
 
       auto pose = model->WorldPose();
-      pose = model_->WorldPose().Inverse() * pose;
-      if (max_distance_.has_value() && pose.Pos().Length() > max_distance_.value()) {
-        continue;
-      }
-
       auto & det = msg.detections.emplace_back();
       det.id = name;
       det.bbox.size =
@@ -151,6 +140,6 @@ public:
   }
 };
 
-GZ_REGISTER_MODEL_PLUGIN(GazeboRosDetections)
+GZ_REGISTER_WORLD_PLUGIN(GazeboRosObjectList)
 
 } // namespace gazebo_ros_vision

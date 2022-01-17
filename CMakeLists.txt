@@ -27,12 +27,19 @@ ament_target_dependencies(gazebo_ros_logical_camera
   "vision_msgs"
 )
 
+add_library(gazebo_ros_object_list SHARED src/gazebo_ros_object_list.cpp)
+target_include_directories(gazebo_ros_object_list PRIVATE src)
+ament_target_dependencies(gazebo_ros_object_list
+  "gazebo_ros"
+  "vision_msgs"
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(TARGETS gazebo_ros_detections gazebo_ros_logical_camera
+install(TARGETS gazebo_ros_detections gazebo_ros_logical_camera gazebo_ros_object_list
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})

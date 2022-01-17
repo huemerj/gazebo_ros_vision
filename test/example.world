@@ -28,6 +28,48 @@
                 </collision>
             </link>
         </model>
+        <!-- model behind the camera, should be seen by detections, but not by logical camera-->
+        <model name="whitelisted_behind">
+            <pose>-3.0 0 0.5 0 0 0</pose>
+            <static>true</static>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+        <!-- model far from the camera, should not by seen by detections or camera -->
+        <model name="whitelisted_far">
+            <pose>10 0 0.5 0 0 0</pose>
+            <static>true</static>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
         <model name="detector">
             <pose>-2 0 1 0 0 0</pose>
             <static>true</static>
@@ -76,27 +118,26 @@
                     </plugin>
                 </sensor>
             </link>
+            <!-- model plugin publishes object list relative to model -->
+            <plugin name="detector_detections" filename="libgazebo_ros_detections.so">
+                <ros>
+                    <remapping>~/detections:=detector/detections</remapping>
+                </ros>
+                <!-- frame name should be detector (same as model) -->
+                <update_rate>1.0</update_rate>
+                <max_distance>5.0</max_distance>
+                <model_whitelist>
+                    <prefix>whitelisted</prefix>
+                </model_whitelist>
+            </plugin>
         </model>
 
-        <plugin name="detection_global" filename="libgazebo_ros_detections.so">
+        <plugin name="detection_global" filename="libgazebo_ros_object_list.so">
             <ros>
                 <remapping>~/detections:=world/detections</remapping>
             </ros>
-            <frame_name>map</frame_name>
-            <update_rate>2</update_rate>
+            <update_rate>2.0</update_rate>
             <bounding_box_size>2.0 2.0 0.2</bounding_box_size>
-            <model_whitelist>
-                <prefix>whitelisted</prefix>
-            </model_whitelist>
-        </plugin>
-
-        <!-- set frame_name to a model to publish model poses relative to the model of same name-->
-        <plugin name="detection_local" filename="libgazebo_ros_detections.so">
-            <ros>
-                <remapping>~/detections:=detector/detections</remapping>
-            </ros>
-            <frame_name>detector</frame_name>
-            <max_distance>10.0</max_distance>
             <model_whitelist>
                 <prefix>whitelisted</prefix>
             </model_whitelist>

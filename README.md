@@ -1,6 +1,10 @@
-Publish simulated model poses as `vision_msgs/msg/Detection3DArray`.
+Publish simulated Gazebo model poses as `vision_msgs/msg/Detection3DArray`.
 
-For usage examples you can check `test/example.world`, or run the world in Gazebo:
+* `gazebo_ros_logical_camera` publishes model poses seen by a logical camera (SensorPlugin)
+* `gazebo_ros_detections` publishes model poses relative to a model (ModelPlugin)
+* `gazebo_ros_object_list` publishes model poses in a world (WorldPlugin)
+
+For usage examples check `test/example.world`, or run the world in Gazebo:
 
 ```bash
 gazebo --verbose -s libgazebo_ros_init.so -s libgazebo_ros_factory.so test/example.world
