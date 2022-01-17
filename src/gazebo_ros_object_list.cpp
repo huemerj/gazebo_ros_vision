@@ -58,6 +58,8 @@ private:
 
   Vector3d bounding_box_size_;
 
+  Vector3d bounding_box_offset_;
+
   /// Update event connection
   gazebo::event::ConnectionPtr update_connection_;
 
@@ -98,6 +100,7 @@ public:
     }
     pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
     bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
+    bounding_box_offset_ = _sdf->Get<Vector3d>("bounding_box_offset", Vector3d::Zero).first;
 
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
       "~/detections", qos.get_publisher_qos("~/detections", rclcpp::SensorDataQoS().reliable()));
@@ -127,6 +130,9 @@ public:
       det.id = name;
       det.bbox.size =
         gazebo_ros::Convert<Vector3>(bounding_box_size_);
+      det.bbox.center.position.x = bounding_box_offset_.X();
+      det.bbox.center.position.y = bounding_box_offset_.Y();
+      det.bbox.center.position.z = bounding_box_offset_.Z();
       auto & result = det.results.emplace_back();
       result.hypothesis.score = 1.0;
       result.hypothesis.class_id = name;
