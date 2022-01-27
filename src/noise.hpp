@@ -100,56 +100,13 @@ public:
     auto z = z_->Apply(v.Z());
     return Vector3d(x, y, z);
   }
-};
-
-class AngularNoise
-{
-private:
-  NoisePtr r_;
-  NoisePtr p_;
-  NoisePtr y_;
-
-public:
-  AngularNoise()
-  : r_(new Noise(Noise::NONE)), p_(new Noise(Noise::NONE)), y_(new Noise(Noise::NONE)) {}
-
-  void Load(sdf::ElementPtr sdf)
-  {
-    auto roll_elem = GetNested(sdf, "roll", "noise");
-    if (roll_elem) {
-      r_ = NoiseFactory::NewNoiseModel(roll_elem);
-    }
-    auto pitch_elem = GetNested(sdf, "pitch", "noise");
-    if (pitch_elem) {
-      p_ = NoiseFactory::NewNoiseModel(pitch_elem);
-    }
-    auto yaw_elem = GetNested(sdf, "yaw", "noise");
-    if (yaw_elem) {
-      y_ = NoiseFactory::NewNoiseModel(yaw_elem);
-    }
-  }
-
-  double sigma_r() const
-  {
-    return sigma(r_);
-  }
-
-  double sigma_p() const
-  {
-    return sigma(p_);
-  }
-
-  double sigma_y() const
-  {
-    return sigma(y_);
-  }
 
   Quaterniond Apply(const Quaterniond & q)
   {
     auto v = q.Euler();
-    auto r = r_->Apply(v.X());
-    auto p = p_->Apply(v.Y());
-    auto y = y_->Apply(v.Z());
+    auto r = x_->Apply(v.X());
+    auto p = y_->Apply(v.Y());
+    auto y = z_->Apply(v.Z());
     return ignition::math::Quaterniond::EulerToQuaternion(r, p, y);
   }
 };
@@ -158,7 +115,7 @@ class PoseNoise
 {
 private:
   VectorNoise pos_noise_;
-  AngularNoise rot_noise_;
+  VectorNoise rot_noise_;
 
 public:
   PoseNoise()
@@ -186,9 +143,9 @@ public:
     auto sx = pos_noise_.sigma_x() * scale;
     auto sy = pos_noise_.sigma_y() * scale;
     auto sz = pos_noise_.sigma_z() * scale;
-    auto sroll = rot_noise_.sigma_r() * scale;
-    auto spitch = rot_noise_.sigma_p() * scale;
-    auto syaw = rot_noise_.sigma_y() * scale;
+    auto sroll = rot_noise_.sigma_x() * scale;
+    auto spitch = rot_noise_.sigma_y() * scale;
+    auto syaw = rot_noise_.sigma_z() * scale;
     pose.covariance[0] = sx * sx;
     pose.covariance[7] = sy * sy;
     pose.covariance[14] = sz * sz;
