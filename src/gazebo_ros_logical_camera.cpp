@@ -16,16 +16,13 @@
 #include <gazebo/common/Events.hh>
 #include <gazebo/sensors/LogicalCameraSensor.hh>
 
-#include <gazebo_ros/conversions/builtin_interfaces.hpp>
-#include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
 #include <gazebo_ros/utils.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
 
 #include <string>
-#include <set>
-#include "noise.hpp"
-#include "utils.hpp"
+#include <memory>
+#include "detection_filter.hpp"
 
 namespace gazebo_ros_vision
 {
@@ -41,17 +38,11 @@ private:
 
   std::string frame_name_;
 
-  std::set<std::string> model_whitelist_;
+  std::unique_ptr<DetectionFilter> filter_;
 
   rclcpp::Publisher<Detection3DArray>::SharedPtr pub_detection_array_;
 
   gazebo::event::ConnectionPtr sensor_update_event_;
-
-  PoseNoise pose_noise_;
-
-  double pose_noise_published_scale_;
-
-  Vector3d bounding_box_size_;
 
 public:
   GazeboRosLogicalCamera() = default;
@@ -72,25 +63,15 @@ protected:
 
     frame_name_ = gazebo_ros::SensorFrameID(*_sensor, *_sdf);
 
-    auto model_whitelist = _sdf->FindElement("model_whitelist");
-    if (model_whitelist) {
-      model_whitelist_ = get_string_set(model_whitelist, "prefix");
-    }
-    if (!model_whitelist_.empty()) {
+    filter_ = DetectionFilter::Load(_sdf);
+    if (!filter_->model_whitelist_.empty()) {
       RCLCPP_INFO(
         node->get_logger(),
         "%s will publish poses of visible models with prefixes:", handleName.c_str());
-      for (const auto & name : model_whitelist_) {
+      for (const auto & name : filter_->model_whitelist_) {
         RCLCPP_INFO(node->get_logger(), "* %s", name.c_str());
       }
     }
-
-    auto pose_noise = _sdf->FindElement("pose_noise");
-    if (pose_noise) {
-      pose_noise_.Load(pose_noise);
-    }
-    pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
-    bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
 
     auto qos = node->get_qos().get_publisher_qos("~/detections");
     pub_detection_array_ = node->create_publisher<Detection3DArray>("~/detections", qos);
@@ -110,21 +91,13 @@ protected:
       camera_->LastUpdateTime());
     auto image = camera_->Image();
     for (const auto & model : image.model()) {
-      if (!starts_with_one_of(model.name(), model_whitelist_)) {
-        continue;
+      ModelItem item;
+      item.name = model.name();
+      item.pose = gazebo::msgs::ConvertIgn(model.pose());
+      auto detection = filter_->get_detection(item);
+      if (detection.has_value()) {
+        msg.detections.push_back(detection.value());
       }
-      auto & det = msg.detections.emplace_back();
-      det.id = model.name();
-      det.results.resize(1);
-
-      Pose3d pose = gazebo::msgs::ConvertIgn(model.pose());
-      pose = pose_noise_.Apply(pose);
-      det.results[0].hypothesis.score = 1.0;
-      det.bbox.size = gazebo_ros::Convert<Vector3>(bounding_box_size_);
-      det.results[0].pose.pose =
-        gazebo_ros::Convert<geometry_msgs::msg::Pose>(
-        pose);
-      pose_noise_.SetCovariance(det.results[0].pose, pose_noise_published_scale_);
     }
     pub_detection_array_->publish(msg);
   }

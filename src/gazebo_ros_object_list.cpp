@@ -24,8 +24,8 @@
 #include <memory>
 
 #include <vision_msgs/msg/detection3_d_array.hpp>
-#include "utils.hpp"
-#include "noise.hpp"
+#include "detection_filter.hpp"
+#include "rate_control.hpp"
 
 namespace gazebo_ros_vision
 {
@@ -44,23 +44,12 @@ private:
 
   rclcpp::Publisher<Detection3DArray>::SharedPtr pub_detections_;
 
-  std::set<std::string> model_whitelist_;
-
   RateControl rate_control_;
 
   std::string frame_name_{"map"};
 
-  std::optional<double> max_distance_;
+  std::unique_ptr<DetectionFilter> filter_;
 
-  PoseNoise pose_noise_;
-
-  double pose_noise_published_scale_;
-
-  Vector3d bounding_box_size_;
-
-  Vector3d bounding_box_offset_;
-
-  /// Update event connection
   gazebo::event::ConnectionPtr update_connection_;
 
 public:
@@ -73,19 +62,6 @@ public:
     ros_node_ = gazebo_ros::Node::Get(_sdf);
     const gazebo_ros::QoS & qos = ros_node_->get_qos();
 
-    auto model_whitelist = _sdf->FindElement("model_whitelist");
-    if (model_whitelist) {
-      model_whitelist_ = get_string_set(model_whitelist, "prefix");
-    }
-    if (!model_whitelist_.empty()) {
-      RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "%s will publish poses of visible models with prefixes:", this->handleName.c_str());
-      for (const auto & name : model_whitelist_) {
-        RCLCPP_INFO(ros_node_->get_logger(), "* %s", name.c_str());
-      }
-    }
-
     auto update_rate = _sdf->Get<double>("update_rate", 1.0);
     rate_control_ = RateControl(update_rate.first);
     if (!update_rate.second) {
@@ -94,13 +70,15 @@ public:
 
     auto frame_name = _sdf->Get<std::string>("frame_name", "map").first;
 
-    auto pose_noise = _sdf->FindElement("pose_noise");
-    if (pose_noise) {
-      pose_noise_.Load(pose_noise);
+    filter_ = DetectionFilter::Load(_sdf);
+    if (!filter_->model_whitelist_.empty()) {
+      RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "%s will publish poses of visible models with prefixes:", handleName.c_str());
+      for (const auto & name : filter_->model_whitelist_) {
+        RCLCPP_INFO(ros_node_->get_logger(), "* %s", name.c_str());
+      }
     }
-    pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
-    bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
-    bounding_box_offset_ = _sdf->Get<Vector3d>("bounding_box_offset", Vector3d::Zero).first;
 
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
       "~/detections", qos.get_publisher_qos("~/detections"));
@@ -118,30 +96,16 @@ public:
     Detection3DArray msg;
     msg.header.frame_id = frame_name_;
     msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(info.simTime);
-
     for (const auto & model: world_->Models()) {
-      auto name = model->GetName();
-      if (!starts_with_one_of(name, model_whitelist_)) {
-        continue;
+      ModelItem item;
+      item.name = model->GetName();
+      item.pose = model->WorldPose();
+
+      auto detection = filter_->get_detection(item);
+      if (detection.has_value()) {
+        msg.detections.push_back(detection.value());
       }
-
-      auto pose = model->WorldPose();
-      auto & det = msg.detections.emplace_back();
-      det.id = name;
-      det.bbox.size =
-        gazebo_ros::Convert<Vector3>(bounding_box_size_);
-      det.bbox.center.position.x = bounding_box_offset_.X();
-      det.bbox.center.position.y = bounding_box_offset_.Y();
-      det.bbox.center.position.z = bounding_box_offset_.Z();
-      auto & result = det.results.emplace_back();
-      result.hypothesis.score = 1.0;
-      result.hypothesis.class_id = name;
-
-      pose = pose_noise_.Apply(pose);
-      result.pose.pose = gazebo_ros::Convert<Pose>(pose);
-      pose_noise_.SetCovariance(det.results[0].pose, pose_noise_published_scale_);
     }
-
     pub_detections_->publish(msg);
   }
 };
