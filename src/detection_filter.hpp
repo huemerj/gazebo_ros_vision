@@ -16,6 +16,7 @@
 #include <set>
 #include <string>
 #include <memory>
+#include <random>
 #include <ignition/math/Pose3.hh>
 #include <vision_msgs/msg/detection3_d.hpp>
 #include <gazebo_ros/conversions/builtin_interfaces.hpp>
@@ -70,10 +71,20 @@ private:
 
   Vector3d bounding_box_offset_;
 
+  double recall_;
+
+  std::random_device rd_;
+
+  std::mt19937 gen_;
+
+  std::uniform_real_distribution<> dist_;
+
 public:
   std::set<std::string> model_whitelist_;
 
-  DetectionFilter() = default;
+  DetectionFilter() : recall_(1.0), gen_(rd_()), dist_(0, 1) {
+    
+  }
 
   static std::unique_ptr<DetectionFilter> Load(sdf::ElementPtr _sdf)
   {
@@ -88,15 +99,18 @@ public:
       filter->pose_noise_.Load(pose_noise);
     }
     filter->pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
-
     filter->bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
     filter->bounding_box_offset_ = _sdf->Get<Vector3d>("bounding_box_offset", Vector3d::Zero).first;
+    filter->recall_ = _sdf->Get("recall", 1.0).first;
     return filter;
   }
 
   std::optional<Detection3D> get_detection(const ModelItem & model)
   {
     if (!starts_with_one_of(model.name, model_whitelist_)) {
+      return std::nullopt;
+    }
+    if (dist_(gen_) > recall_) {
       return std::nullopt;
     }
 
