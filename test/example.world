@@ -123,7 +123,7 @@
                 <ros>
                     <remapping>~/detections:=detector/detections</remapping>
                 </ros>
-                <!-- frame name should be detector (same as model) -->
+                <!-- message header frame name should be 'detector' (same as model) -->
                 <update_rate>1.0</update_rate>
                 <max_distance>5.0</max_distance>
                 <model_whitelist>

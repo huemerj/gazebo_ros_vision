@@ -79,7 +79,7 @@ protected:
     if (!model_whitelist_.empty()) {
       RCLCPP_INFO(
         node->get_logger(),
-        "gazebo_ros_logical_camera will publish poses of visible models with prefixes:");
+        "%s will publish poses of visible models with prefixes:", handleName.c_str());
       for (const auto & name : model_whitelist_) {
         RCLCPP_INFO(node->get_logger(), "* %s", name.c_str());
       }
@@ -92,9 +92,7 @@ protected:
     pose_noise_published_scale_ = _sdf->Get("pose_noise_published_scale", 1.0).first;
     bounding_box_size_ = _sdf->Get<Vector3d>("bounding_box_size", Vector3d::One).first;
 
-    auto qos = node->get_qos().get_publisher_qos(
-      "~/detections",
-      rclcpp::SensorDataQoS().reliable());
+    auto qos = node->get_qos().get_publisher_qos("~/detections");
     pub_detection_array_ = node->create_publisher<Detection3DArray>("~/detections", qos);
 
     sensor_update_event_ =

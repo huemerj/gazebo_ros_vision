@@ -80,7 +80,7 @@ public:
     if (!model_whitelist_.empty()) {
       RCLCPP_INFO(
         ros_node_->get_logger(),
-        "gazebo_ros_detections will publish poses of visible models with prefixes:");
+        "%s will publish poses of visible models with prefixes:", this->handleName.c_str());
       for (const auto & name : model_whitelist_) {
         RCLCPP_INFO(ros_node_->get_logger(), "* %s", name.c_str());
       }
@@ -103,7 +103,7 @@ public:
     bounding_box_offset_ = _sdf->Get<Vector3d>("bounding_box_offset", Vector3d::Zero).first;
 
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
-      "~/detections", qos.get_publisher_qos("~/detections", rclcpp::SensorDataQoS().reliable()));
+      "~/detections", qos.get_publisher_qos("~/detections"));
 
     update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
       std::bind(&GazeboRosObjectList::OnUpdate, this, std::placeholders::_1));

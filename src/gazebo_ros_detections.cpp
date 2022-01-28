@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <gazebo/common/Plugin.hh>
+#include <gazebo/sensors/Sensor.hh>
+#include <gazebo/sensors/SensorManager.hh>
 #include <gazebo/physics/Link.hh>
 #include <gazebo/physics/Model.hh>
 #include <gazebo/physics/World.hh>
@@ -43,6 +45,8 @@ private:
   gazebo::physics::ModelPtr model_;
 
   gazebo::physics::LinkPtr reference_link_;
+
+  gazebo::sensors::SensorPtr reference_sensor_;
 
   gazebo_ros::Node::SharedPtr ros_node_;
 
@@ -83,7 +87,7 @@ public:
     if (!model_whitelist_.empty()) {
       RCLCPP_INFO(
         ros_node_->get_logger(),
-        "gazebo_ros_detections will publish poses of visible models with prefixes:");
+        "%s will publish poses of visible models with prefixes:", handleName.c_str());
       for (const auto & name : model_whitelist_) {
         RCLCPP_INFO(ros_node_->get_logger(), "* %s", name.c_str());
       }
@@ -95,18 +99,23 @@ public:
       RCLCPP_DEBUG(ros_node_->get_logger(), "plugin missing <update_rate>, defaults to 1Hz");
     }
 
-    auto frame_name_elem = _sdf->FindElement("frame_name");
-    if (frame_name_elem) {
-      frame_name_ = frame_name_elem->Get<std::string>();
-      reference_link_ = model_->GetLink(frame_name_);
-      if (!reference_link_) {
-        RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid link");
-        return;
+    auto frame_name_elem = _sdf->Get<std::string>("frame_name", model_->GetName());
+    frame_name_ = frame_name_elem.first;
+    if (frame_name_elem.second) {
+      if (_sdf->Get<bool>("frame_is_sensor", false).first) {
+        reference_sensor_ = gazebo::sensors::SensorManager::Instance()->GetSensor(frame_name_);
+        if (!reference_sensor_) {
+          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid sensor");
+          return;
+        }
+      } else {
+        reference_link_ = model_->GetLink(frame_name_);
+        if (!reference_link_) {
+          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid link");
+          return;
+        }
       }
-    } else {
-      frame_name_ = model_->GetName();
     }
-    frame_name_ = _sdf->Get<std::string>("frame_name", model_->GetName()).first;
 
     auto max_distance = _sdf->FindElement("max_distance");
     if (max_distance) {
@@ -124,7 +133,7 @@ public:
 
     const gazebo_ros::QoS & qos = ros_node_->get_qos();
     pub_detections_ = ros_node_->create_publisher<Detection3DArray>(
-      "~/detections", qos.get_publisher_qos("~/detections", rclcpp::SensorDataQoS().reliable()));
+      "~/detections", qos.get_publisher_qos("~/detections"));
 
     update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
       std::bind(&GazeboRosDetections::OnUpdate, this, std::placeholders::_1));
@@ -148,11 +157,11 @@ public:
 
       auto pose = model->WorldPose();
 
-      Pose3d reference_pose;
+      Pose3d reference_pose = model_->WorldPose();
       if (reference_link_) {
         reference_pose = reference_link_->WorldPose();
-      } else {
-        reference_pose = model_->WorldPose();
+      } else if (reference_sensor_) {
+        reference_pose = reference_sensor_->Pose() * reference_pose;
       }
       pose = reference_pose.Inverse() * pose;
       if (max_distance_.has_value() && pose.Pos().Length() > max_distance_.value()) {
