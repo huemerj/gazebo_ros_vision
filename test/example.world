@@ -81,7 +81,7 @@
                         <near>1.0</near>
                         <far>8.0</far>
                         <aspect_ratio>1.33333</aspect_ratio>
-                        <horizontal_fov>30</horizontal_fov>
+                        <horizontal_fov>0.52</horizontal_fov>
                     </logical_camera>
                     <visualize>true</visualize>
                     <plugin name="camera_detections" filename="libgazebo_ros_logical_camera.so">
@@ -96,24 +96,25 @@
                             <position>
                                 <x>
                                     <noise type="gaussian_quantized">
-                                        <stddev>1.0</stddev>
-                                        <precision>0.1</precision>
+                                        <stddev>0.1</stddev>
+                                        <precision>0.01</precision>
                                     </noise>
                                 </x>
                                 <y>
                                     <noise type="gaussian_quantized">
-                                        <stddev>1.0</stddev>
-                                        <precision>0.1</precision>
+                                        <stddev>0.1</stddev>
+                                        <precision>0.01</precision>
                                     </noise>
                                 </y>
                                 <z>
                                     <noise type="gaussian_quantized">
-                                        <stddev>1.0</stddev>
-                                        <precision>0.1</precision>
+                                        <stddev>0.1</stddev>
+                                        <precision>0.01</precision>
                                     </noise>
                                 </z>
                             </position>
                         </pose_noise>
+                        <false_positive_p>0.01</false_positive_p>
                         <pose_noise_published_scale>2.0</pose_noise_published_scale>
                     </plugin>
                 </sensor>

@@ -86,6 +86,18 @@ public:
     
   }
 
+  Vector3d bounding_box_size() const {
+    return bounding_box_size_;
+  }
+
+  double pose_noise_published_scale() const {
+    return pose_noise_published_scale_;
+  }
+
+  const PoseNoise& pose_noise() const {
+    return pose_noise_;
+  }
+
   static std::unique_ptr<DetectionFilter> Load(sdf::ElementPtr _sdf)
   {
     auto filter = std::make_unique<DetectionFilter>();
