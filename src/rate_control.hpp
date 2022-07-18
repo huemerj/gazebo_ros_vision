@@ -31,7 +31,7 @@ public:
       last_t_ = t;
     }
     auto dt = (t - last_t_).Double();
-    if (dt > rate_inv_.value()) {
+    if (dt >= rate_inv_.value()) {
       last_t_ = t;
       return true;
     }
