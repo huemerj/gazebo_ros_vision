@@ -126,14 +126,15 @@ public:
     msg.header.frame_id = frame_name_;
     msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(info.simTime);
 
-    for (const auto & model: model_->GetWorld()->Models()) {
-      Pose3d reference_pose = model_->WorldPose();
-      if (reference_link_) {
-        reference_pose = reference_link_->WorldPose();
-      } else if (reference_sensor_) {
-        reference_pose = reference_sensor_->Pose() * reference_pose;
-      }
+    Pose3d reference_pose;
+    if (reference_link_) {
+      reference_pose = reference_link_->WorldPose();
+    } else if (reference_sensor_) {
+      auto parent_link = model_->GetLinkById(reference_sensor_->ParentId());
+      reference_pose = parent_link->WorldPose() * reference_sensor_->Pose();
+    }
 
+    for (const auto & model: model_->GetWorld()->Models()) {
       ModelItem item;
       item.name = model->GetName();
       item.pose = reference_pose.Inverse() * model->WorldPose();

@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+    <world name="gazebo_ros_vision_test">
+        <include>
+            <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/Ground Plane</uri>
+        </include>
+        <model name="target">
+            <pose>1 5 0.5 0 0 0</pose>
+            <static>true</static>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>1 1 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+        <model name="detector">
+            <pose>1 0 0 0 0 0</pose>
+            <static>true</static>
+            <link name="root" />
+            <link name="camera">
+                <pose>0 0 1 0 0 1.5707963267948966</pose>
+                <sensor type="camera" name="camera">
+                    <pose>1 0 0 0 0 0</pose>
+                    <always_on>1</always_on>
+                    <update_rate>1</update_rate>
+                    <camera>
+                        <aspect_ratio>1.33333</aspect_ratio>
+                        <horizontal_fov>0.52</horizontal_fov>
+                    </camera>
+                </sensor>
+            </link>
+            <joint name="camera_joint" type="fixed">
+                <parent>root</parent>
+                <child>camera</child>
+            </joint>
+            <plugin name="detector_detections" filename="libgazebo_ros_detections.so">
+                <ros>
+                    <remapping>~/detections:=/detections</remapping>
+                </ros>
+                <frame_name>camera</frame_name>
+                <frame_is_sensor>true</frame_is_sensor>
+                <update_rate>1.0</update_rate>
+                <max_distance>10.0</max_distance>
+                <model_whitelist>
+                    <prefix>target</prefix>
+                </model_whitelist>
+            </plugin>
+        </model>
+    </world>
+</sdf>
