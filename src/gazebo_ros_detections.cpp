@@ -81,13 +81,13 @@ public:
       if (_sdf->Get<bool>("frame_is_sensor", false).first) {
         reference_sensor_ = gazebo::sensors::SensorManager::Instance()->GetSensor(frame_name_);
         if (!reference_sensor_) {
-          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid sensor");
+          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid sensor: %s",frame_name_.c_str());
           return;
         }
       } else {
         reference_link_ = model_->GetLink(frame_name_);
         if (!reference_link_) {
-          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid link");
+          RCLCPP_ERROR(ros_node_->get_logger(), "<frame_name> references invalid link: %s ",frame_name_.c_str());
           return;
         }
       }
